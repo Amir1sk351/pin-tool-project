@@ -4,13 +4,13 @@
 int main() {
     volatile int data = 42;
     // Test CLFLUSH
-    _mm_clflush((void*)&data); // CLFLUSH instruction
+    _mm_clflush((void*)&data);
     // Test MFENCE
-    _mm_mfence();       // MFENCE instruction
+    _mm_mfence();
     // Test LFENCE
-    _mm_lfence();       // LFENCE instruction
+    _mm_lfence();
     // Test SFENCE
-    _mm_sfence();       // SFENCE instruction
+    _mm_sfence();
     std::cout << "Flush/Fence test completed!" << std::endl;
     return 0;
 }

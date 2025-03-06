@@ -1,28 +1,42 @@
 #include "pin.H"
 #include <iostream>
 #include <fstream>
-#include <sys/syscall.h>
+#include "xed-iclass-enum.h"
 
-std::ofstream syscallLog;
+std::ofstream flushLog;
 
-VOID LogSyscall(THREADID tid, CONTEXT* ctx, SYSCALL_STANDARD std, VOID* v) {
-    ADDRINT syscallNum = PIN_GetSyscallNumber(ctx, std);
-    syscallLog << "Syscall #" << syscallNum << " detected (TID: " << tid << ")" << std::endl;
-    std::cerr << "Syscall #" << syscallNum << " detected (TID: " << tid << ")" << std::endl;
+VOID LogFlushFence(VOID* ip, const std::string& disasm) {
+    flushLog << "Detected: " << disasm << " at address: " << ip << std::endl;
+    std::cerr << "Detected: " << disasm << " at address: " << ip << std::endl;
+}
+
+VOID Instruction(INS ins, VOID* v) {
+    if (INS_Opcode(ins) == XED_ICLASS_CLFLUSH || 
+        INS_Opcode(ins) == XED_ICLASS_MFENCE || 
+        INS_Opcode(ins) == XED_ICLASS_LFENCE || 
+        INS_Opcode(ins) == XED_ICLASS_SFENCE) { 
+        std::string disasm = INS_Disassemble(ins);
+        INS_InsertCall(
+            ins, IPOINT_BEFORE, (AFUNPTR)LogFlushFence,
+            IARG_INST_PTR,
+            IARG_PTR, new std::string(disasm),
+            IARG_END
+        );
+    }
 }
 
 int main(int argc, char* argv[]) {
-    syscallLog.open("syscall_trace.out");
-    if (!syscallLog.is_open()) {
-        std::cerr << "Failed to open syscall_trace.out!" << std::endl;
+    flushLog.open("flushtrace.out");
+    if (!flushLog.is_open()) {
+        std::cerr << "Failed to open flushtrace.out!" << std::endl;
         return 1;
     }
     if (PIN_Init(argc, argv)) {
         std::cerr << "This tool should not be run independently." << std::endl;
         return 1;
     }
-    PIN_AddSyscallEntryFunction(LogSyscall, NULL);
+    INS_AddInstrumentFunction(Instruction, 0);
     PIN_StartProgram();
-    syscallLog.close();
+    flushLog.close();
     return 0;
 }
